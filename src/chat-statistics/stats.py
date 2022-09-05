@@ -3,9 +3,9 @@ from pathlib import Path
 from typing import Union
 
 import arabic_reshaper
-from loguru import logger
 from bidi.algorithm import get_display
 from hazm import Normalizer, word_tokenize
+from loguru import logger
 from src.data import DATA_DIR
 from wordcloud import WordCloud
 
@@ -13,6 +13,7 @@ from wordcloud import WordCloud
 class ChatStatistics:
     """Generates chat word cloud from a telegram chat json file.
     """
+
     def __init__(self, chat_json: Union[str, Path]) -> None:
         """
         :param chat_json: telegram chat json file
@@ -42,7 +43,12 @@ class ChatStatistics:
         content = self.normalizer.normalize(content)
         return content
 
-    def generate_word_cloud(self, output_dir: Union[str, Path]):
+    def generate_word_cloud(self,
+                            output_dir: Union[str, Path],
+                            width: int = 800,
+                            height: int = 600,
+                            background_color: str = 'white'
+                            ):
         """Generates a word cloud from the chat data
 
         :param output_dir: path to output directory for word cloud image
@@ -72,18 +78,18 @@ class ChatStatistics:
         logger.info('Generating word cloud...')
         # generate word cloud
         wordcloud = WordCloud(
-            width=1200, height=1200,
+            width=width, height=height,
             font_path=str(DATA_DIR / 'BNazanin.ttf'),
-            background_color='white'
+            background_color=background_color
         ).generate(text_content)
 
         text_content = arabic_reshaper.reshape(text_content)
         text_content = get_display(text_content)
 
         wordcloud = WordCloud(
-            width=800, height=800,
-            font_path=str(DATA_DIR / 'Vazir.ttf'),
-            background_color='white'
+            width=width, height=height,
+            font_path=str(DATA_DIR / 'BNazanin.ttf'),
+            background_color=background_color
         ).generate(text_content)
 
         logger.info(f"Saving word cloud to {output_dir}")
