@@ -18,7 +18,7 @@ class ChatStatistics:
         """
         :param chat_json: telegram chat json file
         """
-        logger.info(f"Loading chat dat from {chat_json}")
+        logger.info(f"Loading chat data from {chat_json}")
         # load chat data
         with open(chat_json, 'r') as f:
             self.chat_data = json.load(f)
@@ -73,22 +73,12 @@ class ChatStatistics:
 
         # reshape final word cloud
         text_content = arabic_reshaper.reshape(text_content)
-        text_content = get_display(text_content)
 
         logger.info('Generating word cloud...')
         # generate word cloud
         wordcloud = WordCloud(
             width=width, height=height,
-            font_path=str(DATA_DIR / 'BNazanin.ttf'),
-            background_color=background_color
-        ).generate(text_content)
-
-        text_content = arabic_reshaper.reshape(text_content)
-        text_content = get_display(text_content)
-
-        wordcloud = WordCloud(
-            width=width, height=height,
-            font_path=str(DATA_DIR / 'BNazanin.ttf'),
+            font_path=str(DATA_DIR / 'Vazir.ttf'),
             background_color=background_color
         ).generate(text_content)
 
