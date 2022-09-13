@@ -1,9 +1,9 @@
 import json
+from collections import defaultdict
 from pathlib import Path
-from typing import Union
+from typing import List, Union
 
 import arabic_reshaper
-from bidi.algorithm import get_display
 from hazm import Normalizer, word_tokenize
 from loguru import logger
 from src.data import DATA_DIR
@@ -28,8 +28,77 @@ class ChatStatistics:
         # load stopwords
         logger.info(f"Loading stopwords from {DATA_DIR / 'stopwords.txt'}")
         stop_words = open(DATA_DIR / 'stopwords.txt').readlines()
-        stop_words = list(map(str.strip, stop_words))
-        self.stop_words = list(map(self.normalizer.normalize, stop_words))
+        stop_words = map(str.strip, stop_words)
+        self.stop_words = set(map(self.normalizer.normalize, stop_words))
+
+    @staticmethod
+    def rebuild_msg(msg: list) -> str:
+        """Rebuilds input message
+
+        :param msg: input message
+        :return: rebuilded message
+        """
+        msg_text = ''
+        for sub_msg in msg:
+            if isinstance(sub_msg, dict):
+                msg_text += sub_msg['text'] + " "
+            else:
+                msg_text += sub_msg + " "
+        return msg_text
+
+    def msg_has_question(self, msg: dict) -> bool:
+        """Checks if a message has a question
+
+        :param msg: message to check
+        :return: True if message has question, False else
+        """
+        text = ''
+        if isinstance(msg['text'], str):
+            text = msg['text']
+
+        elif isinstance(msg['text'], list):
+            text = self.rebuild_msg(msg['text'])
+
+        if '?' in text or '؟' in text:
+            return True
+        return False
+
+    def get_top_users(self, top_n: int = 10) -> List[tuple]:
+        """Get top users from chat data
+
+        :param top_n: numbers of top users, defaults to 10
+        :return: users and number of replies as a tuple
+        """
+        # creating mapping to check which messages are questions
+        is_question = defaultdict(bool)
+        users = {}
+        for msg in self.chat_data['messages']:
+            is_question[msg['id']] = self.msg_has_question(msg)
+
+        # Getting top users based on replying to questions by others
+        logger.info('Getting top users of chat data...')
+        for msg in self.chat_data['messages']:
+            if not msg.get('reply_to_message_id'):
+                continue
+
+            if msg['from_id'] in users.keys():
+                users[msg['from_id']]['replies'].append(
+                    msg['reply_to_message_id'])
+
+            elif is_question[msg['reply_to_message_id']]:
+                users[msg['from_id']] = {
+                    'name': msg['from'],
+                    'replies': [msg['reply_to_message_id']]
+                }
+
+        logger.info('Calculating users with most replies to questions...')
+        reply_conut = [(k, len(v['replies'])) for k, v in users.items()]
+        users_with_most_replies = [
+            (users[user[0]]['name'], user[1]) for user in sorted(
+                reply_conut, key=lambda x: x[1], reverse=True
+            )
+        ]
+        return users_with_most_replies[:top_n]
 
     def process_text(self, text: str) -> str:
         """Filters and normalizes input text
@@ -58,18 +127,16 @@ class ChatStatistics:
         logger.info('Loading text content...')
         text_content = ''
         for msg in self.chat_data['messages']:
+            text = ''
             if isinstance(msg['text'], str):
-                content = self.process_text(msg['text'])
+                text = msg['text']
+                content = self.process_text(text)
                 text_content += f" {content}"
 
             elif isinstance(msg['text'], list):
-                for item in msg['text']:
-                    if isinstance(item, dict):
-                        content = self.process_text(item['text'])
-                        text_content += f" {content}"
-                    else:
-                        content = self.process_text(item)
-                        text_content += f" {content}"
+                text = self.rebuild_msg(msg['text'])
+                content = self.process_text(text)
+                text_content += f" {content}"
 
         # reshape final word cloud
         text_content = arabic_reshaper.reshape(text_content)
@@ -87,6 +154,8 @@ class ChatStatistics:
 
 
 if __name__ == '__main__':
-    chat_stats = ChatStatistics(chat_json=DATA_DIR / 'ml.json')
+    chat_stats = ChatStatistics(chat_json=DATA_DIR / 'ml_2.json')
     chat_stats.generate_word_cloud(DATA_DIR)
+    for user in chat_stats.get_top_users(top_n=15):
+        print(user)
     print("Done!")
